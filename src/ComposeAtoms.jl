@@ -60,8 +60,8 @@ plotschemes = Dict(
             :atborder => 0.3,
             :bondwidth => 0.3,
             :axisbuffer => 0.05,
-            :atcolors => ["tomato", "aquamarine3"],
-            :atradii => [0.4, 0.35],
+            :atcolors => ["tomato", "aquamarine3", "purple"],
+            :atradii => [0.4, 0.35, 0.3],
             :bdryradius => 0.1
    ),
 )
@@ -183,12 +183,12 @@ end
 
 
 
-function compose_layers(at::AbstractAtoms, zlayers;
-                  X=nothing, scheme = plotscheme[:layers],
-                  axis = autoaxis(X, scheme),
-                  rcut = rnn(at) * 1.2, bg = false,
-                  Iqm = Int[], Ibdry = Int[], Ibuf = Int[],   # ignore all except Ibrdy for now
-                  kwargs... )
+function compose_layers( at::AbstractAtoms, zlayers;
+                        X=nothing, scheme = plotscheme[:layers],
+                        axis = autoaxis(X, scheme),
+                        rcut = rnn(at) * 1.2, bg = false,
+                        Iqm = Int[], Ibdry = Int[], Ibuf = Int[],   # ignore all except Ibrdy for now
+                        kwargs... )
 
    analyse_kwargs!(scheme; kwargs...)
    i, j = unique_bonds(at, rcut; X=X)
@@ -196,21 +196,21 @@ function compose_layers(at::AbstractAtoms, zlayers;
       X = positions(at)
    end
 
-   # temporarily assume we have only 2 layers.
-   @assert length(zlayers) == 2
-
-   # group atoms into layers
-   distl = abs(zlayers[2] - zlayers[1])
    # add atoms to one of the two layers
    z = mat(X)[3,:]
-   I1 = find( abs(z - zlayers[1]) .<= distl / 2 )
-   I2 = setdiff(1:length(X), I1)
-   I1 = setdiff(I1, Ibdry)
-   I2 = setdiff(I2, Ibdry)
+   II = [ Int[] for j = 1:length(zlayers) ]
+   for j = 1:length(z)
+      _, i = findmin(abs(z[j] - zlayers))
+      push!(II[i], j)
+   end
+   for Ij in II
+      Ij = setdiff(Ij, Ibdry)
+   end
 
-   ctx = compose( context(axis),
-      compose_atoms( X[I1], axis, scheme[:atradii][1], scheme[:atcolors][1], scheme[:atborder], scheme[:bondcol] ),
-      compose_atoms( X[I2], axis, scheme[:atradii][2], scheme[:atcolors][2], scheme[:atborder], scheme[:bondcol] ),
+   cat = [ compose_atoms( X[II[j]], axis, scheme[:atradii][j], scheme[:atcolors][j],
+                          scheme[:atborder], scheme[:bondcol] )  for j = 1:length(II) ]
+
+   ctx = compose( context(axis), cat...,
       compose_atoms( X[Ibdry], axis, scheme[:bdryradius], scheme[:bdrycol], scheme[:atborder], scheme[:bondcol] ),
       compose_bonds( X, (i, j), scheme, axis )
                )
